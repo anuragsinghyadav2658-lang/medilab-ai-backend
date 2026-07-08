@@ -91,9 +91,9 @@ public class AuthController {
         String googleToken = payload.get("token");
 
         try {
-            // FIXME: Apna Google Client ID yahan dalna hoga jab Google Cloud Console par
-            // app banaoge
-            String CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+                        // Google Cloud Console se generate kiya hua Client ID
+            String CLIENT_ID = "544441269934-lu0k8ste87fb3j2k1kv4kb21m24070hh.apps.googleusercontent.com";
+
 
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(),
                     new GsonFactory())
