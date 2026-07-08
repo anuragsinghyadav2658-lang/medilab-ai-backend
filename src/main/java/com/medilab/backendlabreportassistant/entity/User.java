@@ -30,9 +30,14 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Column(columnDefinition = "boolean default false")
+        @Column(columnDefinition = "boolean default false")
     private boolean emailAlertsEnabled = false;
 
     @Column(name = "phone")
     private String phone;
+
+    // NAYA CODE: Social login track karne ke liye
+    @Column(name = "auth_provider", columnDefinition = "varchar(50) default 'manual'")
+    private String authProvider = "manual";
 }
+

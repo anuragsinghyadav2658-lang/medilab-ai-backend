@@ -9,6 +9,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+
+import java.util.Collections;
+import java.util.UUID;
 
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +83,62 @@ public class AuthController {
 
         // Return token and user info normally
         return ResponseEntity.ok(new AuthResponse(token, user.getFullName(), user.getEmail()));
+    }
+
+    // 3. Google Social Login Endpoint
+    @PostMapping("/google")
+    public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> payload) {
+        String googleToken = payload.get("token");
+
+        try {
+            // FIXME: Apna Google Client ID yahan dalna hoga jab Google Cloud Console par
+            // app banaoge
+            String CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(),
+                    new GsonFactory())
+                    .setAudience(Collections.singletonList(CLIENT_ID))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(googleToken);
+
+            if (idToken != null) {
+                GoogleIdToken.Payload googlePayload = idToken.getPayload();
+                String email = googlePayload.getEmail();
+                String name = (String) googlePayload.get("name");
+
+                // Check karo agar user pehle se database me hai
+                Optional<User> userOptional = userRepository.findByEmail(email);
+                User user;
+
+                if (userOptional.isPresent()) {
+                    user = userOptional.get();
+                } else {
+                    // Naya user banao Google ke data se
+                    user = new User();
+                    user.setFullName(name);
+                    user.setEmail(email);
+                    // Google users ko password ki zaroorat nahi, par DB error na de isliye ek
+                    // random dummy password daal diya
+                    user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                    user.setAuthProvider("google"); // Track karne ke liye ki Google se aaya hai
+
+                    userRepository.save(user);
+                }
+
+                // Apna normal JWT token bana ke frontend ko bhej do (Taaki aage ka sab same
+                // chale)
+                String token = jwtUtil.generateToken(user.getEmail());
+                return ResponseEntity.ok(new AuthResponse(token, user.getFullName(), user.getEmail()));
+
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid Google token."));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Google login failed on server."));
+        }
     }
 
     // --- DTO Classes (Inner Classes taaki extra files na banani pade) ---
