@@ -13,6 +13,10 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -85,52 +89,45 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(token, user.getFullName(), user.getEmail()));
     }
 
-    // 3. Google Social Login Endpoint
+    // 3. Google Social Login Endpoint (Access Token Verified)
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> payload) {
-        String googleToken = payload.get("token");
+        String accessToken = payload.get("token");
 
         try {
-                        // Google Cloud Console se generate kiya hua Client ID
-            String CLIENT_ID = "544441269934-lu0k8ste87fb3j2k1kv4kb21m24070hh.apps.googleusercontent.com";
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            HttpEntity<String> entity = new HttpEntity<>("", headers);
 
+            // Google se user ki detail fetch karna
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    HttpMethod.GET,
+                    entity,
+                    Map.class);
 
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(),
-                    new GsonFactory())
-                    .setAudience(Collections.singletonList(CLIENT_ID))
-                    .build();
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> userInfo = response.getBody();
+                String email = (String) userInfo.get("email");
+                String name = (String) userInfo.get("name");
 
-            GoogleIdToken idToken = verifier.verify(googleToken);
-
-            if (idToken != null) {
-                GoogleIdToken.Payload googlePayload = idToken.getPayload();
-                String email = googlePayload.getEmail();
-                String name = (String) googlePayload.get("name");
-
-                // Check karo agar user pehle se database me hai
                 Optional<User> userOptional = userRepository.findByEmail(email);
                 User user;
 
                 if (userOptional.isPresent()) {
                     user = userOptional.get();
                 } else {
-                    // Naya user banao Google ke data se
                     user = new User();
                     user.setFullName(name);
                     user.setEmail(email);
-                    // Google users ko password ki zaroorat nahi, par DB error na de isliye ek
-                    // random dummy password daal diya
                     user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-                    user.setAuthProvider("google"); // Track karne ke liye ki Google se aaya hai
-
+                    user.setAuthProvider("google");
                     userRepository.save(user);
                 }
 
-                // Apna normal JWT token bana ke frontend ko bhej do (Taaki aage ka sab same
-                // chale)
-                String token = jwtUtil.generateToken(user.getEmail());
-                return ResponseEntity.ok(new AuthResponse(token, user.getFullName(), user.getEmail()));
-
+                String jwtToken = jwtUtil.generateToken(user.getEmail());
+                return ResponseEntity.ok(new AuthResponse(jwtToken, user.getFullName(), user.getEmail()));
             } else {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid Google token."));
             }
