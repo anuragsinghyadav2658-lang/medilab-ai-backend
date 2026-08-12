@@ -5,7 +5,8 @@ import com.medilab.backendlabreportassistant.repository.MedicalReportRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
+import com.medilab.backendlabreportassistant.entity.Patient;
+import com.medilab.backendlabreportassistant.repository.PatientRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,25 +14,30 @@ import java.util.List;
 public class ReportService {
 
     @Autowired
+    private PatientRepository patientRepository;
+
+    @Autowired
     private MedicalReportRepository medicalReportRepository;
 
     @Autowired
     private AiService aiService;
 
-    // React se aayi PDF/Image file receive karega, analyze karega aur TiDB me save karega
-    public MedicalReport saveAndAnalyzeReport(MultipartFile file) {
-        
-        // 1. File ko AiService me bhej kar extract & analyze karana
+    public MedicalReport saveAndAnalyzeReport(MultipartFile file, Long patientId) {
         String aiResult = aiService.analyzePdfReport(file);
-        
-        // 2. Naya MedicalReport object banana aur details set karna
+
         MedicalReport report = new MedicalReport();
         report.setFileName(file.getOriginalFilename());
         report.setFileType(file.getContentType());
         report.setAiSummary(aiResult);
-        report.setUploadDate(LocalDateTime.now()); // Explicitly date set kar di
-        
-        // 3. Database (TiDB/MySQL) me save karna
+        report.setUploadDate(LocalDateTime.now());
+
+        // Patient ko ID se nikal kar map karna
+        if (patientId != null) {
+            Patient patient = patientRepository.findById(patientId)
+                    .orElseThrow(() -> new RuntimeException("Patient not found with ID: " + patientId));
+            report.setPatient(patient);
+        }
+
         return medicalReportRepository.save(report);
     }
 

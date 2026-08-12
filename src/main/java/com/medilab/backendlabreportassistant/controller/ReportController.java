@@ -46,10 +46,11 @@ public class ReportController {
     @PostMapping("/upload")
     public ResponseEntity<?> uploadReport(
             @RequestParam("file") MultipartFile file,
+            @RequestParam("patientId") Long patientId,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        // Report save aur AI analysis run karna
-        MedicalReport savedReport = reportService.saveAndAnalyzeReport(file);
+        // Report save aur AI analysis run karna (patientId pass kar ke)
+        MedicalReport savedReport = reportService.saveAndAnalyzeReport(file, patientId);
 
         if (savedReport == null) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process report.");
@@ -66,21 +67,15 @@ public class ReportController {
                     User user = userOptional.get();
                     String aiSummary = savedReport.getAiSummary();
 
-                    // 1. Check if User has enabled email alerts
                     if (user.isEmailAlertsEnabled() && aiSummary != null) {
-
-                        // 2. Case-insensitive keyword checking (High, Critical, Abnormal)
                         String lowerSummary = aiSummary.toLowerCase();
                         if (lowerSummary.contains("high") || lowerSummary.contains("critical")
                                 || lowerSummary.contains("abnormal")) {
-
-                            // 3. Email trigger karna
                             emailService.sendCriticalAlert(user.getEmail(), user.getFullName(), aiSummary);
                         }
                     }
                 }
             } catch (Exception e) {
-                // System crash na ho isliye error console me print karke flow normal rakhenge
                 System.err.println("Error processing auto email alert trigger: " + e.getMessage());
             }
         }
