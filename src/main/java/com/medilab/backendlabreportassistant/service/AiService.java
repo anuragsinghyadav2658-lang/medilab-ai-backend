@@ -33,11 +33,18 @@ public class AiService {
     public String analyzePdfReport(MultipartFile file) {
         try {
             String contentType = file.getContentType();
-            
-            // Updated Prompt with Strict Extraction Rules
-            String prompt = "Act as an expert doctor. Analyze this medical lab report and give a simple summary in 2-3 lines for a patient."
-                          + "\n\nIMPORTANT: At the end of your analysis, you MUST strictly append the exact vital signs in this exact format: [HeartRate: value] [BP: value] [BloodSugar: value] [Temp: value]. If a value is missing, write N/A.";
-            
+
+            // Final Updated Prompt with exact conversational Hinglish/Hindi tone
+            String prompt = "Act as a friendly and expert doctor. Analyze this medical lab report. "
+                    + "You MUST return the response STRICTLY as a valid JSON object only, without any markdown formatting (do not use ```json or ```). "
+                    + "The JSON structure must exactly match this format: "
+                    + "{ \"abnormal_vitals\": [\"list of vitals that are outside the normal range\"], "
+                    + "\"overall_summary\": \"...\", "
+                    + "\"diet_plan\": \"...\" }. "
+                    + "The overall_summary and diet_plan MUST be in highly conversational, simple Hinglish/Hindi, exactly like a local doctor explaining a report to a patient. "
+                    + "Example tone to strictly follow: \"Aapka khoon thoda kam hai 10g/dL par, aamtor par ye 15g/dL hota hai to aapko thakawat feel ho sakti hai. Hari sabziya aur iron wali diet badhayein. Aur neeche di gayi medicine ko 2 weeks tak chalayein.\" "
+                    + "Use this exact natural, empathetic style for all explanations.";
+
             RestTemplate restTemplate = new RestTemplate();
             ObjectMapper objectMapper = new ObjectMapper();
             String url = apiUrl + "?key=" + apiKey;
@@ -49,12 +56,13 @@ public class AiService {
             Map<String, Object> textPart = new HashMap<>();
 
             // Agar file Image hai (PNG/JPEG)
-            if (contentType != null && (contentType.equals("image/png") || contentType.equals("image/jpeg") || contentType.equals("image/jpg"))) {
+            if (contentType != null && (contentType.equals("image/png") || contentType.equals("image/jpeg")
+                    || contentType.equals("image/jpg"))) {
                 textPart.put("text", prompt);
                 partsList.add(textPart);
 
                 String base64Image = Base64.getEncoder().encodeToString(file.getBytes());
-                
+
                 Map<String, Object> inlineData = new HashMap<>();
                 inlineData.put("mime_type", contentType);
                 inlineData.put("data", base64Image);
@@ -62,7 +70,7 @@ public class AiService {
                 Map<String, Object> imagePart = new HashMap<>();
                 imagePart.put("inline_data", inlineData);
                 partsList.add(imagePart);
-            } 
+            }
             // Agar file PDF hai
             else if (contentType != null && contentType.equals("application/pdf")) {
                 String extractedText = "";
@@ -77,7 +85,7 @@ public class AiService {
 
                 textPart.put("text", prompt + "\n\n[EXTRACTED_TEXT]\n" + extractedText);
                 partsList.add(textPart);
-            } 
+            }
             // Invalid file type
             else {
                 return "Error: Unsupported file format. Please upload a PDF, PNG, or JPEG file.";
@@ -95,12 +103,12 @@ public class AiService {
 
             JsonNode rootNode = objectMapper.readTree(response.getBody());
             return rootNode.path("candidates")
-                           .get(0)
-                           .path("content")
-                           .path("parts")
-                           .get(0)
-                           .path("text")
-                           .asText();
+                    .get(0)
+                    .path("content")
+                    .path("parts")
+                    .get(0)
+                    .path("text")
+                    .asText();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -119,17 +127,17 @@ public class AiService {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             String prompt;
-            
+
             // Context check: Agar context hai toh usko prompt me daalo
             if (context != null && !context.trim().isEmpty()) {
-                prompt = "You are an expert AI medical assistant named MediLab AI. Here is the user's latest medical report summary: " 
-                         + context 
-                         + "\n\nBased on this data, answer the user's health-related query in a helpful, concise, and easy-to-understand manner. Query: " 
-                         + userMessage;
+                prompt = "You are an expert AI medical assistant named MediLab AI. Here is the user's latest medical report summary: "
+                        + context
+                        + "\n\nBased on this data, answer the user's health-related query in a helpful, concise, and easy-to-understand manner. Query: "
+                        + userMessage;
             } else {
                 // Bina context wala normal behavior
-                prompt = "You are an expert AI medical assistant named MediLab AI. Answer the user's health-related query in a helpful, concise, and easy-to-understand manner. Query: " 
-                         + userMessage;
+                prompt = "You are an expert AI medical assistant named MediLab AI. Answer the user's health-related query in a helpful, concise, and easy-to-understand manner. Query: "
+                        + userMessage;
             }
 
             Map<String, Object> textPart = new HashMap<>();
@@ -146,12 +154,12 @@ public class AiService {
 
             JsonNode rootNode = objectMapper.readTree(response.getBody());
             return rootNode.path("candidates")
-                           .get(0)
-                           .path("content")
-                           .path("parts")
-                           .get(0)
-                           .path("text")
-                           .asText();
+                    .get(0)
+                    .path("content")
+                    .path("parts")
+                    .get(0)
+                    .path("text")
+                    .asText();
 
         } catch (Exception e) {
             e.printStackTrace();
